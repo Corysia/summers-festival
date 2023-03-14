@@ -1,14 +1,30 @@
+// @ts-check
 import "@babylonjs/core/Debug/debugLayer";
 import "@babylonjs/inspector";
 import "@babylonjs/loaders/glTF";
-import { Engine, Scene, Vector3, Color4, FreeCamera } from "@babylonjs/core";
 import { AdvancedDynamicTexture, Button, Control  } from "@babylonjs/gui";
+import { FreeCamera } from "@babylonjs/core/Cameras/freeCamera";
+import { Engine } from "@babylonjs/core/Engines/engine";
+import { Vector3 } from "@babylonjs/core/Maths/math";
+import { Color4 } from "@babylonjs/core/Maths/math.color";
+import { Scene } from "@babylonjs/core/scene";
 
 class App {
     private scene: Scene;
     private canvas: HTMLCanvasElement;
     private engine: Engine;
 
+    /**
+     * Creates an instance of App.
+     * @memberof App
+     * @constructor
+     * @description
+     * 1. Create a canvas element
+     * 2. Initialize babylon scene and engine
+     * 3. Handle the browser's resize
+     * 4. Hide/show the Inspector
+     * 5. Start the game
+     */
     constructor() {
         this.canvas = this.createCanvas();
 
@@ -39,6 +55,16 @@ class App {
         });
     }
 
+    /**
+     * Start the game
+     * @returns {Promise<void>}
+     * @memberof App
+     * @private
+     * @method main
+     * @description
+     * 1. Go to the start screen
+     * 2. Run the render loop
+     */
     private async main(): Promise<void> {
         await this.goToStart();
 
@@ -47,7 +73,27 @@ class App {
         });
     }
 
-    private async goToStart() {
+    /**
+     * Start the game
+     * @returns {Promise<void>}
+     * @memberof App
+     * @private
+     * @method goToStart
+     * @description
+     * 1. Create a new scene
+     * 2. Create a camera
+     * 3. Create a fullscreen UI
+     * 4. Create a button
+     * 5. Add a click event to the button
+     * 6. Dispose the current scene
+     * 7. Set the new scene as the current scene
+     * 8. Set the state to START
+     * 9. Run the render loop
+     * @example
+     * this.goToStart();
+     * @see https://doc.babylonjs.com/how_to/gui#simple-button
+     */
+    private async goToStart(): Promise<void> {
         console.log("goToStart");
         this.engine.displayLoadingUI();
         this.scene.detachControl();
@@ -83,10 +129,25 @@ class App {
         this.engine.hideLoadingUI();
         this.scene.dispose()
         this.scene = scene;
-        //this.state = State.START;
+        // this.state = State.START;
     }
 
-    createCanvas(): HTMLCanvasElement {
+    /**
+     * Create a canvas element and append it to the DOM
+     * @returns {HTMLCanvasElement}
+     * @memberof App
+     * @private
+     * @method createCanvas
+     * @description
+     * 1. Create a canvas element
+     * 2. Set the canvas element's width and height to 100%
+     * 3. Set the canvas element's id to "gameCanvas"
+     * 4. Append the canvas element to the DOM
+     * @example
+     * this.createCanvas();
+     * @see https://developer.mozilla.org/en-US/docs/Web/API/Document/createElement
+     */
+    private createCanvas(): HTMLCanvasElement {
         var canvas = document.createElement("canvas");
         canvas.style.width = "100%";
         canvas.style.height = "100%";
