@@ -9,10 +9,13 @@ import { Vector3 } from "@babylonjs/core/Maths/math";
 import { Color4 } from "@babylonjs/core/Maths/math.color";
 import { Scene } from "@babylonjs/core/scene";
 
+enum State { START = 0, GAME = 1, LOSE = 2, CUTSCENE = 3 }
 class App {
     private scene: Scene;
     private canvas: HTMLCanvasElement;
     private engine: Engine;
+
+    private state: State = State.START;
 
     /**
      * Creates an instance of App.
@@ -129,9 +132,47 @@ class App {
         this.engine.hideLoadingUI();
         this.scene.dispose()
         this.scene = scene;
-        // this.state = State.START;
+        this.state = State.START;
     }
 
+    /**
+     * Display the losing screen
+     * @returns {Promise<void>}
+     * @memberof App
+     * @private
+     * @method goToLose
+     * @description
+     */
+    private async goToLose(): Promise<void> {
+        this.engine.displayLoadingUI();
+    
+        //--SCENE SETUP--
+        this.scene.detachControl();
+        let scene = new Scene(this.engine);
+        scene.clearColor = new Color4(0, 0, 0, 1);
+        let camera = new FreeCamera("camera1", new Vector3(0, 0, 0), scene);
+        camera.setTarget(Vector3.Zero());
+    
+        //--GUI--
+        const guiMenu = AdvancedDynamicTexture.CreateFullscreenUI("UI");
+        const mainBtn = Button.CreateSimpleButton("mainmenu", "MAIN MENU");
+        mainBtn.width = 0.2;
+        mainBtn.height = "40px";
+        mainBtn.color = "white";
+        guiMenu.addControl(mainBtn);
+        //this handles interactions with the start button attached to the scene
+        mainBtn.onPointerUpObservable.add(() => {
+            this.goToStart();
+        });
+    
+        //--SCENE FINISHED LOADING--
+        await scene.whenReadyAsync();
+        this.engine.hideLoadingUI(); //when the scene is ready, hide loading
+        //lastly set the current state to the lose state and set the scene to the lose scene
+        this.scene.dispose();
+        this.scene = scene;
+        this.state = State.LOSE;
+    }
     /**
      * Create a canvas element and append it to the DOM
      * @returns {HTMLCanvasElement}
