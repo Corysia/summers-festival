@@ -8,14 +8,20 @@ import { Engine } from "@babylonjs/core/Engines/engine";
 import { Vector3 } from "@babylonjs/core/Maths/math";
 import { Color4 } from "@babylonjs/core/Maths/math.color";
 import { Scene } from "@babylonjs/core/scene";
+import { ArcRotateCamera } from "@babylonjs/core/Cameras/arcRotateCamera";
+import { HemisphericLight } from "@babylonjs/core/Lights/hemisphericLight";
+import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
+import { Mesh } from "@babylonjs/core/Meshes/mesh";
 
 enum State { START = 0, GAME = 1, LOSE = 2, CUTSCENE = 3 }
 class App {
-    private scene: Scene;
-    private canvas: HTMLCanvasElement;
-    private engine: Engine;
+    private _scene: Scene;
+    private _canvas: HTMLCanvasElement;
+    private _engine: Engine;
 
-    private state: State = State.START;
+    private _state: State = State.START;
+    private _gameScene: Scene;
+    private _cutScene: Scene;
 
     /**
      * Creates an instance of App.
@@ -24,31 +30,27 @@ class App {
      * @description
      * 1. Create a canvas element
      * 2. Initialize babylon scene and engine
-     * 3. Handle the browser's resize
-     * 4. Hide/show the Inspector
-     * 5. Start the game
+     * 3. Hide/show the Inspector
+     * 4. Start the game
      */
     constructor() {
-        this.canvas = this.createCanvas();
+        console.debug("constructor");
+        this._canvas = this.createCanvas();
 
         // initialize babylon scene and engine
-        this.engine = new Engine(this.canvas, true);
-        this.scene = new Scene(this.engine);
-
-        // handle the browser's resize
-        window.addEventListener("resize", () => {
-            this.engine.resize();
-        });
+        this._engine = new Engine(this._canvas, true);
+        this._scene = new Scene(this._engine);
 
         // hide/show the Inspector
         window.addEventListener("keydown", (ev) => {
             // Shift+Ctrl+Alt+I
             // keyCode 73 = I, need to use this because ev.key === "I" doesn't work on a Mac
+            console.log(ev.shiftKey, ev.ctrlKey, ev.altKey, ev.keyCode, ev.key)
             if (ev.shiftKey && ev.ctrlKey && ev.altKey && ev.keyCode === 73) {
-                if (this.scene.debugLayer.isVisible()) {
-                    this.scene.debugLayer.hide();
+                if (this._scene.debugLayer.isVisible()) {
+                    this._scene.debugLayer.hide();
                 } else {
-                    this.scene.debugLayer.show();
+                    this._scene.debugLayer.show();
                 }
             }
         });
@@ -67,12 +69,34 @@ class App {
      * @description
      * 1. Go to the start screen
      * 2. Run the render loop
+     * 3. Handle the browser's resize
      */
     private async main(): Promise<void> {
-        await this.goToStart();
+        console.debug("main");
+        await this._goToStart();
 
-        this.engine.runRenderLoop(() => {
-            this.scene.render();
+        this._engine.runRenderLoop(() => {
+            switch (this._state) {
+                case State.START:
+                    this._scene.render();
+                    break;
+                case State.CUTSCENE:
+                    this._scene.render();
+                    break;
+                case State.GAME:
+                    this._scene.render();
+                    break;
+                case State.LOSE:
+                    this._scene.render();
+                    break;
+                default:
+                    break;
+            }
+        });
+
+        // handle the browser's resize
+        window.addEventListener("resize", () => {
+            this._engine.resize();
         });
     }
 
@@ -81,7 +105,7 @@ class App {
      * @returns {Promise<void>}
      * @memberof App
      * @private
-     * @method goToStart
+     * @method _goToStart
      * @description
      * 1. Create a new scene
      * 2. Create a camera
@@ -93,15 +117,15 @@ class App {
      * 8. Set the state to START
      * 9. Run the render loop
      * @example
-     * this.goToStart();
+     * this._goToStart();
      * @see https://doc.babylonjs.com/how_to/gui#simple-button
      */
-    private async goToStart(): Promise<void> {
-        console.log("goToStart");
-        this.engine.displayLoadingUI();
-        this.scene.detachControl();
+    private async _goToStart(): Promise<void> {
+        console.debug("goToStart");
+        this._engine.displayLoadingUI();
+        this._scene.detachControl();
 
-        let scene = new Scene(this.engine);
+        let scene = new Scene(this._engine);
         scene.clearColor = new Color4(0, 0, 0, 1);
         let camera = new FreeCamera("camera", new Vector3(0, 0, 0), scene);
         camera.setTarget(Vector3.Zero());
@@ -123,16 +147,78 @@ class App {
         guiMenu.addControl(startButton);
 
         startButton.onPointerUpObservable.add(() => {
-            // this.goToCutScene();
-            console.log("startButton");
+            this._goToCutScene();
+            console.debug("startButton pressed");
             scene.detachControl();
         });
 
         await scene.whenReadyAsync();
-        this.engine.hideLoadingUI();
-        this.scene.dispose()
-        this.scene = scene;
-        this.state = State.START;
+        this._engine.hideLoadingUI();
+        this._scene.dispose()
+        this._scene = scene;
+        this._state = State.START;
+    }
+
+    
+    /**
+     * Show the cut scene
+     * @description
+     * 1. Create a new scene
+     * 2. Create a camera
+     * 3. Create a fullscreen UI
+     * 4. Create a button
+     * 5. Add a click event to the button
+     * 6. Dispose the current scene
+     * 7. Set the new scene as the current scene
+     * 8. Set the state to START
+     * 9. Run the render loop
+     * @private
+     * @async
+     * @returns {Promise<void>}
+     */
+    private async _goToCutScene(): Promise<void> {
+        console.debug("goToCutScene");
+        this._engine.displayLoadingUI();
+        //--SETUP SCENE--
+        // Don't detect any inputs from this ui while the game is loading
+        this._scene.detachControl();
+        this._cutScene = new Scene(this._engine);
+        let camera = new FreeCamera("camera1", new Vector3(0, 0, 0), this._cutScene);
+        camera.setTarget(Vector3.Zero());
+        this._cutScene.clearColor = new Color4(0, 0, 0, 1);
+
+         //--GUI--
+        const cutScene = AdvancedDynamicTexture.CreateFullscreenUI("cutscene");
+
+        //--PROGRESS DIALOGUE--
+        const next = Button.CreateSimpleButton("next", "NEXT");
+        next.color = "white";
+        next.thickness = 0;
+        next.verticalAlignment = Control.VERTICAL_ALIGNMENT_BOTTOM;
+        next.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_RIGHT;
+        next.width = "64px";
+        next.height = "64px";
+        next.top = "-3%";
+        next.left = "-12%";
+        cutScene.addControl(next);
+
+        next.onPointerUpObservable.add(() => {
+            console.debug("next pressed");
+            this._goToGame();
+        })
+
+        //--WHEN SCENE IS FINISHED LOADING--
+        await this._cutScene.whenReadyAsync();
+        this._engine.hideLoadingUI();
+        this._scene.dispose();
+        this._state = State.CUTSCENE;
+        this._scene = this._cutScene;
+
+        //--START LOADING AND SETTING UP THE GAME DURING THIS SCENE--
+        var finishedLoading = false;
+        await this._setUpGame().then(res =>{
+            finishedLoading = true;
+        });
     }
 
     /**
@@ -142,13 +228,25 @@ class App {
      * @private
      * @method goToLose
      * @description
+     * 1. Create a new scene
+     * 2. Create a camera
+     * 3. Create a fullscreen UI
+     * 4. Create a button
+     * 5. Add a click event to the button
+     * 6. Dispose the current scene
+     * 7. Set the new scene as the current scene
+     * 8. Set the state to START
+     * 9. Run the render loop
+     * @example
+     * this._goToLose();
      */
-    private async goToLose(): Promise<void> {
-        this.engine.displayLoadingUI();
+    private async _goToLose(): Promise<void> {
+        console.debug("goToLose");
+        this._engine.displayLoadingUI();
     
         //--SCENE SETUP--
-        this.scene.detachControl();
-        let scene = new Scene(this.engine);
+        this._scene.detachControl();
+        let scene = new Scene(this._engine);
         scene.clearColor = new Color4(0, 0, 0, 1);
         let camera = new FreeCamera("camera1", new Vector3(0, 0, 0), scene);
         camera.setTarget(Vector3.Zero());
@@ -162,16 +260,17 @@ class App {
         guiMenu.addControl(mainBtn);
         //this handles interactions with the start button attached to the scene
         mainBtn.onPointerUpObservable.add(() => {
-            this.goToStart();
+            console.debug("mainBtn pressed");
+            this._goToStart();
         });
     
         //--SCENE FINISHED LOADING--
         await scene.whenReadyAsync();
-        this.engine.hideLoadingUI(); //when the scene is ready, hide loading
+        this._engine.hideLoadingUI(); //when the scene is ready, hide loading
         //lastly set the current state to the lose state and set the scene to the lose scene
-        this.scene.dispose();
-        this.scene = scene;
-        this.state = State.LOSE;
+        this._scene.dispose();
+        this._scene = scene;
+        this._state = State.LOSE;
     }
     /**
      * Create a canvas element and append it to the DOM
@@ -189,6 +288,7 @@ class App {
      * @see https://developer.mozilla.org/en-US/docs/Web/API/Document/createElement
      */
     private createCanvas(): HTMLCanvasElement {
+        console.debug("createCanvas");
         var canvas = document.createElement("canvas");
         canvas.style.width = "100%";
         canvas.style.height = "100%";
@@ -196,5 +296,56 @@ class App {
         document.body.appendChild(canvas);
         return canvas;
     }
+
+    private async _setUpGame() {
+        console.debug("setupGame");
+        let scene = new Scene(this._engine);
+        this._gameScene = scene;
+    }
+
+    private async _goToGame(){
+        console.debug("goToGame");
+        //--SETUP SCENE--
+        this._scene.detachControl();
+        let scene = this._gameScene;
+        scene.clearColor = new Color4(0.01568627450980392, 0.01568627450980392, 0.20392156862745098); // a color that fit the overall color scheme better
+        let camera: ArcRotateCamera = new ArcRotateCamera("Camera", Math.PI / 2, Math.PI / 2, 2, Vector3.Zero(), scene);
+        camera.setTarget(Vector3.Zero());
+    
+        //--GUI--
+        const playerUI = AdvancedDynamicTexture.CreateFullscreenUI("UI");
+        // Don't detect any inputs from this ui while the game is loading
+        scene.detachControl();
+    
+        //create a simple button
+        const loseBtn = Button.CreateSimpleButton("lose", "LOSE");
+        loseBtn.width = 0.2
+        loseBtn.height = "40px";
+        loseBtn.color = "white";
+        loseBtn.top = "-14px";
+        loseBtn.thickness = 0;
+        loseBtn.verticalAlignment = Control.VERTICAL_ALIGNMENT_BOTTOM;
+        playerUI.addControl(loseBtn);
+    
+        //this handles interactions with the start button attached to the scene
+        loseBtn.onPointerDownObservable.add(() => {
+            console.debug("loseBtn pressed");
+            this._goToLose();
+            scene.detachControl(); //observables disabled
+        });
+    
+        //temporary scene objects
+        var light1: HemisphericLight = new HemisphericLight("light1", new Vector3(1, 1, 0), scene);
+        var sphere: Mesh = MeshBuilder.CreateSphere("sphere", { diameter: 1 }, scene);
+    
+        //get rid of start scene, switch to gamescene and change states
+        this._scene.dispose();
+        this._state = State.GAME;
+        this._scene = scene;
+        this._engine.hideLoadingUI();
+        //the game is ready, attach control back
+        this._scene.attachControl();
+    }
+
 }
 new App();
