@@ -45,8 +45,8 @@ class App {
         window.addEventListener("keydown", (ev) => {
             // Shift+Ctrl+Alt+I
             // keyCode 73 = I, need to use this because ev.key === "I" doesn't work on a Mac
-            console.log(ev.shiftKey, ev.ctrlKey, ev.altKey, ev.keyCode, ev.key)
-            if (ev.shiftKey && ev.ctrlKey && ev.altKey && ev.keyCode === 73) {
+            console.log(ev.shiftKey, ev.ctrlKey, ev.altKey, ev.keyCode, ev.key, ev.code)
+            if (ev.shiftKey && ev.ctrlKey && ev.altKey && ev.code === "KeyI") {
                 if (this._scene.debugLayer.isVisible()) {
                     this._scene.debugLayer.hide();
                 } else {
