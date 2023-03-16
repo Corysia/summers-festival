@@ -40,6 +40,8 @@ class App {
         // initialize babylon scene and engine
         this._engine = new Engine(this._canvas, true);
         this._scene = new Scene(this._engine);
+        this._gameScene = this._scene;
+        this._cutScene = this._scene;
 
         // hide/show the Inspector
         window.addEventListener("keydown", (ev) => {
@@ -338,7 +340,7 @@ class App {
         var light1: HemisphericLight = new HemisphericLight("light1", new Vector3(1, 1, 0), scene);
         var sphere: Mesh = MeshBuilder.CreateSphere("sphere", { diameter: 1 }, scene);
     
-        //get rid of start scene, switch to gamescene and change states
+        //get rid of start scene, switch to the game and change states
         this._scene.dispose();
         this._state = State.GAME;
         this._scene = scene;
