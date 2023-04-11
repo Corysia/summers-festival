@@ -2,16 +2,21 @@
 import "@babylonjs/core/Debug/debugLayer";
 import "@babylonjs/inspector";
 import "@babylonjs/loaders/glTF";
-import { AdvancedDynamicTexture, Button, Control  } from "@babylonjs/gui";
+import { AdvancedDynamicTexture, Button, Control } from "@babylonjs/gui";
 import { FreeCamera } from "@babylonjs/core/Cameras/freeCamera";
 import { Engine } from "@babylonjs/core/Engines/engine";
-import { Vector3 } from "@babylonjs/core/Maths/math";
-import { Color4 } from "@babylonjs/core/Maths/math.color";
+import { Matrix, Quaternion, Vector3 } from "@babylonjs/core/Maths/math";
+import { Color3, Color4 } from "@babylonjs/core/Maths/math.color";
 import { Scene } from "@babylonjs/core/scene";
 import { ArcRotateCamera } from "@babylonjs/core/Cameras/arcRotateCamera";
 import { HemisphericLight } from "@babylonjs/core/Lights/hemisphericLight";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import { Mesh } from "@babylonjs/core/Meshes/mesh";
+import { Environment } from "./environment";
+import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
+import { Player } from "./Player";
+import { ShadowGenerator } from "@babylonjs/core/Lights/Shadows/shadowGenerator";
+import { PointLight } from "@babylonjs/core/Lights/pointLight";
 
 enum State { START = 0, GAME = 1, LOSE = 2, CUTSCENE = 3 }
 class App {
@@ -22,6 +27,10 @@ class App {
     private _state: State = State.START;
     private _gameScene: Scene;
     private _cutScene: Scene;
+
+    public assets;
+    private _environment;
+    private _player?: Player;
 
     /**
      * Creates an instance of App.
@@ -141,7 +150,6 @@ class App {
         startButton.width = 0.2;
         startButton.height = "40px";
         startButton.color = "white";
-        // button1.top = "-14px%";
         startButton.thickness = 0;
         startButton.verticalAlignment = Control.HORIZONTAL_ALIGNMENT_CENTER | Control.VERTICAL_ALIGNMENT_CENTER;
         startButton.cornerRadius = 20;
@@ -161,7 +169,7 @@ class App {
         this._state = State.START;
     }
 
-    
+
     /**
      * Show the cut scene
      * @description
@@ -189,7 +197,7 @@ class App {
         camera.setTarget(Vector3.Zero());
         this._cutScene.clearColor = new Color4(0, 0, 0, 1);
 
-         //--GUI--
+        //--GUI--
         const cutScene = AdvancedDynamicTexture.CreateFullscreenUI("cutscene");
 
         //--PROGRESS DIALOGUE--
@@ -217,8 +225,8 @@ class App {
         this._scene = this._cutScene;
 
         //--START LOADING AND SETTING UP THE GAME DURING THIS SCENE--
-        var finishedLoading = false;
-        await this._setUpGame().then(res =>{
+        let finishedLoading = false;
+        await this._setUpGame().then(res => {
             finishedLoading = true;
         });
     }
@@ -245,14 +253,14 @@ class App {
     private async _goToLose(): Promise<void> {
         console.debug("goToLose");
         this._engine.displayLoadingUI();
-    
+
         //--SCENE SETUP--
         this._scene.detachControl();
         let scene = new Scene(this._engine);
         scene.clearColor = new Color4(0, 0, 0, 1);
         let camera = new FreeCamera("camera1", new Vector3(0, 0, 0), scene);
         camera.setTarget(Vector3.Zero());
-    
+
         //--GUI--
         const guiMenu = AdvancedDynamicTexture.CreateFullscreenUI("UI");
         const mainBtn = Button.CreateSimpleButton("mainmenu", "MAIN MENU");
@@ -265,7 +273,7 @@ class App {
             console.debug("mainBtn pressed");
             this._goToStart();
         });
-    
+
         //--SCENE FINISHED LOADING--
         await scene.whenReadyAsync();
         this._engine.hideLoadingUI(); //when the scene is ready, hide loading
@@ -291,7 +299,7 @@ class App {
      */
     private createCanvas(): HTMLCanvasElement {
         console.debug("createCanvas");
-        var canvas = document.createElement("canvas");
+        let canvas = document.createElement("canvas");
         canvas.style.width = "100%";
         canvas.style.height = "100%";
         canvas.id = "gameCanvas";
@@ -299,26 +307,86 @@ class App {
         return canvas;
     }
 
+    private async _initializeGameAsync(scene): Promise<void> {
+        console.debug("initializeGameAsync");
+        let light0 = new HemisphericLight("HemiLight", new Vector3(0, 1, 0), scene);
+
+        const light = new PointLight("sparklight", new Vector3(0, 0, 0), scene);
+        light.diffuse = new Color3(0.08627450980392157, 0.10980392156862745, 0.15294117647058825);
+        light.intensity = 35;
+        light.radius = 1;
+
+        const shadowGenerator = new ShadowGenerator(1024, light);
+        shadowGenerator.darkness = 0.4;
+
+        this._player = new Player(this.assets, scene, shadowGenerator);
+    }
+
     private async _setUpGame() {
         console.debug("setupGame");
         let scene = new Scene(this._engine);
         this._gameScene = scene;
+
+        // Create Environment
+        const environment = new Environment(scene);
+        this._environment = environment;
+        await this._environment.load();
+        await this._loadCharacterAssets(scene);
     }
 
+    private async _loadCharacterAssets(scene) {
+
+        async function loadCharacter() {
+            //collision mesh
+            const outer = MeshBuilder.CreateBox("outer", { width: 2, depth: 1, height: 3 }, scene);
+            outer.isVisible = false;
+            outer.isPickable = false;
+            outer.checkCollisions = true;
+
+            //move origin of box collider to the bottom of the mesh (to match player mesh)
+            outer.bakeTransformIntoVertices(Matrix.Translation(0, 1.5, 0))
+
+            //for collisions
+            outer.ellipsoid = new Vector3(1, 1.5, 1);
+            outer.ellipsoidOffset = new Vector3(0, 1.5, 0);
+
+            outer.rotationQuaternion = new Quaternion(0, 1, 0, 0); // rotate the player mesh 180 since we want to see the back of the player
+
+            let box = MeshBuilder.CreateBox("Small1", { width: 0.5, depth: 0.5, height: 0.25, faceColors: [new Color4(0, 0, 0, 1), new Color4(0, 0, 0, 1), new Color4(0, 0, 0, 1), new Color4(0, 0, 0, 1), new Color4(0, 0, 0, 1), new Color4(0, 0, 0, 1)] }, scene);
+            box.position.y = 1.5;
+            box.position.z = 1;
+
+            let body = Mesh.CreateCylinder("body", 3, 2, 2, 0, 0, scene);
+            let bodymtl = new StandardMaterial("red", scene);
+            bodymtl.diffuseColor = new Color3(.8, .5, .5);
+            body.material = bodymtl;
+            body.isPickable = false;
+            body.bakeTransformIntoVertices(Matrix.Translation(0, 1.5, 0)); // simulates the imported mesh's origin
+
+            //parent the meshes
+            box.parent = body;
+            body.parent = outer;
+
+            return {
+                mesh: outer as Mesh
+            }
+        }
+        return loadCharacter().then(assets => {
+            this.assets = assets;
+        })
+
+    }
     private async _goToGame(){
-        console.debug("goToGame");
         //--SETUP SCENE--
         this._scene.detachControl();
         let scene = this._gameScene;
         scene.clearColor = new Color4(0.01568627450980392, 0.01568627450980392, 0.20392156862745098); // a color that fit the overall color scheme better
-        let camera: ArcRotateCamera = new ArcRotateCamera("Camera", Math.PI / 2, Math.PI / 2, 2, Vector3.Zero(), scene);
-        camera.setTarget(Vector3.Zero());
-    
+
         //--GUI--
         const playerUI = AdvancedDynamicTexture.CreateFullscreenUI("UI");
-        // Don't detect any inputs from this ui while the game is loading
+        //dont detect any inputs from this ui while the game is loading
         scene.detachControl();
-    
+
         //create a simple button
         const loseBtn = Button.CreateSimpleButton("lose", "LOSE");
         loseBtn.width = 0.2
@@ -328,19 +396,23 @@ class App {
         loseBtn.thickness = 0;
         loseBtn.verticalAlignment = Control.VERTICAL_ALIGNMENT_BOTTOM;
         playerUI.addControl(loseBtn);
-    
+
         //this handles interactions with the start button attached to the scene
         loseBtn.onPointerDownObservable.add(() => {
-            console.debug("loseBtn pressed");
             this._goToLose();
             scene.detachControl(); //observables disabled
         });
-    
-        //temporary scene objects
-        var light1: HemisphericLight = new HemisphericLight("light1", new Vector3(1, 1, 0), scene);
-        var sphere: Mesh = MeshBuilder.CreateSphere("sphere", { diameter: 1 }, scene);
-    
-        //get rid of start scene, switch to the game and change states
+
+        //primitive character and setting
+        await this._initializeGameAsync(scene);
+        
+        //--WHEN SCENE FINISHED LOADING--
+        await scene.whenReadyAsync();
+        const outer = scene.getMeshByName("outer");
+        if (outer) {
+            outer.position = new Vector3(0,3,0);
+        }
+        //get rid of start scene, switch to gamescene and change states
         this._scene.dispose();
         this._state = State.GAME;
         this._scene = scene;
@@ -348,6 +420,5 @@ class App {
         //the game is ready, attach control back
         this._scene.attachControl();
     }
-
 }
-new App();
+const app = new App();
