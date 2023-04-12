@@ -8,7 +8,6 @@ import { Engine } from "@babylonjs/core/Engines/engine";
 import { Matrix, Quaternion, Vector3 } from "@babylonjs/core/Maths/math";
 import { Color3, Color4 } from "@babylonjs/core/Maths/math.color";
 import { Scene } from "@babylonjs/core/scene";
-import { ArcRotateCamera } from "@babylonjs/core/Cameras/arcRotateCamera";
 import { HemisphericLight } from "@babylonjs/core/Lights/hemisphericLight";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import { Mesh } from "@babylonjs/core/Meshes/mesh";
@@ -56,7 +55,7 @@ class App {
         window.addEventListener("keydown", (ev) => {
             // Shift+Ctrl+Alt+I
             // keyCode 73 = I, need to use this because ev.key === "I" doesn't work on a Mac
-            console.log(ev.shiftKey, ev.ctrlKey, ev.altKey, ev.keyCode, ev.key, ev.code)
+            console.debug(ev.shiftKey, ev.ctrlKey, ev.altKey, ev.keyCode, ev.key, ev.code)
             if (ev.shiftKey && ev.ctrlKey && ev.altKey && ev.code === "KeyI") {
                 if (this._scene.debugLayer.isVisible()) {
                     this._scene.debugLayer.hide();
@@ -384,7 +383,7 @@ class App {
 
         //--GUI--
         const playerUI = AdvancedDynamicTexture.CreateFullscreenUI("UI");
-        //dont detect any inputs from this ui while the game is loading
+        // Do not detect any inputs from this ui while the game is loading
         scene.detachControl();
 
         //create a simple button
@@ -412,7 +411,7 @@ class App {
         if (outer) {
             outer.position = new Vector3(0,3,0);
         }
-        //get rid of start scene, switch to gamescene and change states
+        //get rid of start scene, switch to game scene and change states
         this._scene.dispose();
         this._state = State.GAME;
         this._scene = scene;
